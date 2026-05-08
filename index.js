@@ -348,11 +348,68 @@ const sortEntries = (entries, sortLogic = null, sortDirection = null)=>{
 };
 
 const sortEntriesIfNeeded = (name)=>{
+    if (!cache[name]?.loaded) return;
     regroupBookEntries(name);
 };
 
 const cache = {};
+const setListLoading = (isLoading)=>{
+    dom.drawer.body?.classList.toggle('stwid--isLoading', isLoading);
+};
+const withListLoading = async(promise)=>{
+    setListLoading(true);
+    try {
+        return await promise;
+    } finally {
+        setListLoading(false);
+    }
+};
 const getFolderDisplayName = (folderName)=>folderName == UNCATEGORIZED_KEY ? 'Uncategorized' : folderName;
+const loadBookEntries = async(name, bookData = null)=>{
+    const world = cache[name];
+    if (!world) return null;
+    if (world.loaded) return world;
+    if (world.loading) return world.loading;
+
+    world.loading = (async()=>{
+        const data = bookData ?? await loadWorldInfo(name);
+        if (!data?.entries) {
+            world.loading = null;
+            return world;
+        }
+
+        migrateEntryFolders(name, data);
+        world.entries = {};
+        for (const [k,v] of Object.entries(data.entries)) {
+            world.entries[k] = structuredClone(v);
+        }
+        world.dom.entryList.innerHTML = '';
+        world.dom.entry = {};
+        let renderCounter = 0;
+        for (const e of sortEntries(Object.values(world.entries))) {
+            await renderEntry(e, name);
+            renderCounter++;
+            if (renderCounter % 50 == 0) {
+                await delay(0);
+            }
+        }
+        world.loaded = true;
+        regroupBookEntries(name);
+        world.loading = null;
+        return world;
+    })().catch(error=>{
+        world.loading = null;
+        throw error;
+    });
+
+    return world.loading;
+};
+const ensureBookLoaded = async(name)=>cache[name]?.loaded ? cache[name] : await withListLoading(loadBookEntries(name));
+const ensureAllBooksLoaded = async()=>withListLoading((async()=>{
+    for (const name of Object.keys(cache)) {
+        await loadBookEntries(name);
+    }
+})());
 const createStwidMenuItem = (iconClass, label, className = '')=>{
     const item = document.createElement('div');
     item.classList.add('stwid--item');
@@ -511,7 +568,7 @@ const toggleFolder = (worldName, folderName, collapsed = null)=>{
 };
 const regroupBookEntries = (name)=>{
     const world = cache[name];
-    if (!world?.dom?.entryList) return;
+    if (!world?.dom?.entryList || !world.loaded) return;
     const state = getWorldFolderState(name);
     world.dom.folder = Object.create(null);
     world.dom.entryList.querySelectorAll('.stwid--folderHeader, .stwid--folderDropZone').forEach(header=>header.remove());
@@ -743,16 +800,21 @@ const updateWIChange = async(name = null, data = null)=>{
         if (cache[name]) continue;
         else {
             const before = Object.keys(cache).find(it=>it.toLowerCase().localeCompare(name.toLowerCase()) == 1);
-            cache[name] = { entries:{} };
-            const data = await loadWorldInfo(name);
-            migrateEntryFolders(name, data);
-            for (const [k,v] of Object.entries(data.entries)) {
-                cache[name].entries[k] = structuredClone(v);
-            }
-            renderBook(name, before ? cache[before].dom.root : null);
+            await renderBook(name, before ? cache[before].dom.root : null);
         }
     }
     if (name && cache[name]) {
+        if (!cache[name].loaded && !data) {
+            updateWIChangeStarted = Promise.withResolvers();
+            updateWIChangeFinished.resolve();
+            return;
+        }
+        if (!cache[name].loaded && data) {
+            await loadBookEntries(name, data);
+            updateWIChangeStarted = Promise.withResolvers();
+            updateWIChangeFinished.resolve();
+            return;
+        }
         if (!data) data = await loadWorldInfo(name);
         migrateEntryFolders(name, data);
         const world = { entries:{} };
@@ -858,6 +920,7 @@ eventSource.on(event_types.WORLDINFO_SETTINGS_UPDATED, ()=>updateSettingsChange(
 
 
 export const jumpToEntry = async(name, uid)=>{
+    await ensureBookLoaded(name);
     if (dom.activationToggle.classList.contains('stwid--active')) {
         dom.activationToggle.click();
     }
@@ -937,12 +1000,7 @@ const setSelectionDragImage = (evt)=>{
     requestAnimationFrame(()=>preview.remove());
 };
 const renderBook = async(name, before = null, bookData = null)=>{
-    const data = bookData ?? await loadWorldInfo(name);
-    migrateEntryFolders(name, data);
     const world = { entries:{} };
-    for (const [k,v] of Object.entries(data.entries)) {
-        world.entries[k] = structuredClone(v);
-    }
     world.dom = {
         /**@type {HTMLElement} */
         root: undefined,
@@ -957,6 +1015,8 @@ const renderBook = async(name, before = null, bookData = null)=>{
         /**@type {{ [uid:string]:{root:HTMLElement, comment:HTMLElement, key:HTMLElement}}} */
         entry: {},
     };
+    world.loaded = false;
+    world.loading = null;
     cache[name] = world;
     const book = document.createElement('div'); {
         world.dom.root = book;
@@ -1006,7 +1066,12 @@ const renderBook = async(name, before = null, bookData = null)=>{
                 world.dom.name = title;
                 title.classList.add('stwid--title');
                 title.textContent = name;
-                title.addEventListener('click', ()=>{
+                title.title = name;
+                title.addEventListener('click', async()=>{
+                    const isOpening = entryList.classList.contains('stwid--isCollapsed');
+                    if (isOpening) {
+                        await ensureBookLoaded(name);
+                    }
                     const is = entryList.classList.toggle('stwid--isCollapsed');
                     if (is) {
                         collapseToggle.classList.remove('fa-chevron-up');
@@ -1038,6 +1103,7 @@ const renderBook = async(name, before = null, bookData = null)=>{
                     add.classList.add('fa-solid', 'fa-fw', 'fa-plus');
                     add.title = 'New Entry';
                     add.addEventListener('click', async()=>{
+                        await ensureBookLoaded(name);
                         const data = { entries:structuredClone(cache[name].entries) };
                         const newEntry = createWorldInfoEntry(name, data);
                         cache[name].entries[newEntry.uid] = structuredClone(newEntry);
@@ -1172,6 +1238,7 @@ const renderBook = async(name, before = null, bookData = null)=>{
                                     exp.classList.add('stwid--item');
                                     exp.classList.add('stwid--export');
                                     exp.addEventListener('click', async(evt)=>{
+                                        await ensureBookLoaded(name);
                                         download(JSON.stringify({ entries:cache[name].entries }), name, 'application/json');
                                     });
                                     const i = document.createElement('i'); {
@@ -1244,7 +1311,11 @@ const renderBook = async(name, before = null, bookData = null)=>{
                     collapseToggle.classList.add('stwid--action');
                     collapseToggle.classList.add('stwid--collapseToggle');
                     collapseToggle.classList.add('fa-solid', 'fa-fw', 'fa-chevron-down');
-                    collapseToggle.addEventListener('click', ()=>{
+                    collapseToggle.addEventListener('click', async()=>{
+                        const isOpening = entryList.classList.contains('stwid--isCollapsed');
+                        if (isOpening) {
+                            await ensureBookLoaded(name);
+                        }
                         const is = entryList.classList.toggle('stwid--isCollapsed');
                         if (is) {
                             collapseToggle.classList.remove('fa-chevron-up');
@@ -1264,11 +1335,10 @@ const renderBook = async(name, before = null, bookData = null)=>{
             world.dom.entryList = entryList;
             entryList.classList.add('stwid--entryList');
             entryList.classList.add('stwid--isCollapsed');
-            for (const e of sortEntries(Object.values(world.entries))) {
-                await renderEntry(e, name);
-            }
-            regroupBookEntries(name);
             book.append(entryList);
+        }
+        if (bookData) {
+            await loadBookEntries(name, bookData);
         }
         if (before) before.insertAdjacentElement('beforebegin', book);
         else dom.books.append(book);
@@ -1503,9 +1573,8 @@ const renderEntry = async(e, name, before = null)=>{
 };
 const loadList = async()=>{
     dom.books.innerHTML = '';
-    const books = await Promise.all(world_names.toSorted((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase())).map(async(name)=>({ name, data:await loadWorldInfo(name) })));
-    for (const book of books) {
-        await renderBook(book.name, null, book.data);
+    for (const name of world_names.toSorted((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()))) {
+        await renderBook(name);
     }
 };
 const loadListDebounced = debounceAsync(()=>loadList());
@@ -1563,8 +1632,8 @@ const addDrawer = ()=>{
                                     await startPromise;
                                     await updateWIChangeFinished.promise;
                                     cache[finalName].dom.entryList.classList.remove('stwid--isCollapsed');
-                                    cache[name].dom.collapseToggle.classList.add('fa-chevron-up');
-                                    cache[name].dom.collapseToggle.classList.remove('fa-chevron-down');
+                                    cache[finalName].dom.collapseToggle.classList.add('fa-chevron-up');
+                                    cache[finalName].dom.collapseToggle.classList.remove('fa-chevron-down');
                                     cache[finalName].dom.root.scrollIntoView({ block:'center', inline:'center' });
                                 }
                             }
@@ -2084,22 +2153,28 @@ const addDrawer = ()=>{
                 }
                 const filter = document.createElement('div'); {
                     filter.classList.add('stwid--filter');
+                    let searchToken = 0;
                     const search = document.createElement('input'); {
                         search.classList.add('stwid--search');
                         search.classList.add('text_pole');
                         search.type = 'search';
                         search.placeholder = 'Search books';
-                        search.addEventListener('input', ()=>{
+                        search.addEventListener('input', async()=>{
+                            const token = ++searchToken;
                             const query = search.value.toLowerCase();
+                            if (query.length && searchEntriesInput.checked) {
+                                await ensureAllBooksLoaded();
+                                if (token != searchToken) return;
+                            }
                             for (const b of Object.keys(cache)) {
                                 if (query.length) {
                                     const bookMatch = b.toLowerCase().includes(query);
-                                    const entryMatch = searchEntriesInput.checked && Object.values(cache[b].entries).find(e=>e.comment.toLowerCase().includes(query));
+                                    const entryMatch = searchEntriesInput.checked && Object.values(cache[b].entries).find(e=>String(e.comment ?? '').toLowerCase().includes(query));
                                     if (bookMatch || entryMatch) {
                                         cache[b].dom.root.classList.remove('stwid--filter-query');
                                         if (searchEntriesInput.checked) {
                                             for (const e of Object.values(cache[b].entries)) {
-                                                if (bookMatch || e.comment.toLowerCase().includes(query)) {
+                                                if (bookMatch || String(e.comment ?? '').toLowerCase().includes(query)) {
                                                     cache[b].dom.entry[e.uid].root.classList.remove('stwid--filter-query');
                                                 } else {
                                                     cache[b].dom.entry[e.uid].root.classList.add('stwid--filter-query');
@@ -2192,7 +2267,7 @@ const addDrawer = ()=>{
     moDrawer.observe(drawerContent, { attributes:true, attributeFilter:['style'] });
 };
 addDrawer();
-loadListDebounced().then(()=>dom.drawer.body.classList.remove('stwid--isLoading'));
+loadListDebounced().finally(()=>dom.drawer.body.classList.remove('stwid--isLoading'));
 
 
 let isDiscord;

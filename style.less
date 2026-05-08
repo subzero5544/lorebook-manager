@@ -48,7 +48,8 @@ body.stwid-- #WorldInfo {
 		flex-direction: column;
 
 		overflow: hidden;
-		width: 300px;
+		width: clamp(360px, 34vw, 520px);
+		max-width: min(520px, 100%);
 		.stwid--controls {
 			display: flex;
 			gap: 0.25em;
@@ -96,11 +97,14 @@ body.stwid-- #WorldInfo {
                     z-index: 1;
 					.stwid--title {
 						flex: 1 1 auto;
+						min-width: 0;
 						cursor: pointer;
 						font-weight: bold;
 						overflow: hidden;
-						text-overflow: ellipsis;
-						white-space: nowrap;
+						overflow-wrap: anywhere;
+						line-height: 1.2;
+						max-height: 2.4em;
+						white-space: normal;
 					}
 					.stwid--actions {
 						display: flex;
@@ -166,25 +170,37 @@ body.stwid-- #WorldInfo {
                     }
 					.stwid--body {
 						flex: 1 1 auto;
+						min-width: 0;
 						cursor: pointer;
 						overflow: hidden;
 						.stwid--comment {
-							height: 1lh;
+							display: -webkit-box;
+							max-height: 2.4em;
 							overflow: hidden;
 							text-overflow: ellipsis;
-							white-space: nowrap;
+							overflow-wrap: anywhere;
+							line-height: 1.2;
+							white-space: normal;
+							-webkit-box-orient: vertical;
+							-webkit-line-clamp: 2;
 						}
 						.stwid--key {
 							color: var(--SmartThemeEmColor);
 							font-size: smaller;
 							font-style: italic;
-							height: 1lh;
+							display: -webkit-box;
+							max-height: 2.4em;
 							overflow: hidden;
 							text-overflow: ellipsis;
-							white-space: nowrap;
+							overflow-wrap: anywhere;
+							line-height: 1.2;
+							white-space: normal;
+							-webkit-box-orient: vertical;
+							-webkit-line-clamp: 2;
 						}
 					}
 					.stwid--status {
+						flex: 0 0 auto;
 						align-self: center;
 						display: flex;
 						gap: 0.5em;
@@ -619,6 +635,7 @@ body.stwid-- #WorldInfo .stwid--list .stwid--books .stwid--book .stwid--entry.st
 	display: none;
 }
 body.stwid-- #WorldInfo .stwid--list .stwid--books .stwid--book .stwid--entry .stwid--actions {
+	flex: 0 0 auto;
 	align-self: center;
 	display: flex;
 	align-items: center;
