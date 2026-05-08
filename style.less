@@ -58,6 +58,36 @@ body.stwid-- #WorldInfo {
 				color: var(--SmartThemeQuoteColor);
 			}
 		}
+		> .stwip--container {
+			flex: 0 0 auto;
+			display: flex;
+			flex-flow: row wrap;
+			align-items: center;
+			gap: 0.35em 0.5em;
+			width: 100%;
+			max-width: 100%;
+			margin: 0 0 0.5em;
+
+			.stwip--preset {
+				flex: 1 1 220px;
+				min-width: 180px;
+				max-width: 100%;
+			}
+
+			> .stwip--actions {
+				flex: 0 1 auto;
+				display: flex;
+				flex-flow: row wrap;
+				align-items: center;
+				justify-content: flex-end;
+				gap: 0.25em;
+				min-width: max-content;
+			}
+
+			.stwip--action {
+				margin: 0;
+			}
+		}
 		.stwid--filter {
 			display: flex;
 			gap: 0.75em;
@@ -72,6 +102,8 @@ body.stwid-- #WorldInfo {
 			flex: 1 1 auto;
 
 			overflow: auto;
+			padding-right: 0.35em;
+			box-sizing: border-box;
 
 			.stwid--book {
 				border-bottom: 2px solid var(--SmartThemeBorderColor);
@@ -91,6 +123,7 @@ body.stwid-- #WorldInfo {
 				.stwid--head {
 					display: flex;
 					gap: 0.5em;
+					margin-right: 0.25em;
 					background-color: rgb(var(--primaryBgCol, var(--SmartThemeBlurTintColor)));
 					position: sticky;
 					top: 0;
@@ -130,6 +163,7 @@ body.stwid-- #WorldInfo {
 					gap: 0.5em;
 					border-bottom: 2px solid var(--SmartThemeBorderColor);
 					margin-left: 0.25em;
+					margin-right: 0.25em;
 					overflow: hidden;
 					transition: 200ms;
                     &:is(.stwid--isDragging .stwid--entry:not(.stwid--isSelected)) {
@@ -743,4 +777,47 @@ dialog.popup:has(.stwid--folderManage) .popup-content {
 	filter: drop-shadow(1px 1px 2px var(--black50a));
 	pointer-events: none;
 	white-space: nowrap;
+}
+.shadow_popup:has(.stwip--transferModal), .popup:has(.stwip--transferModal) {
+	.dialogue_popup_ok, .popup-button-ok, .stwip--copy {
+		display: flex;
+		align-items: center;
+		flex-direction: column;
+		white-space: pre;
+		font-weight: normal;
+		box-shadow: 0 0 0;
+		transition: 200ms;
+	}
+	.dialogue_popup_ok, .popup-button-ok {
+		&:after {
+			content: 'Transfer';
+			height: 0;
+			overflow: hidden;
+			font-weight: bold;
+		}
+	}
+	.stwip--copy {
+		&:after {
+			content: 'Copy';
+			height: 0;
+			overflow: hidden;
+			font-weight: bold;
+		}
+	}
+	&:has(.stwip--worldSelect:focus) {
+		.dialogue_popup_ok, .popup-button-ok {
+			font-weight: bold;
+			box-shadow: 0 0 10px;
+		}
+		&.stwip--isCopy {
+			.dialogue_popup_ok, .popup-button-ok {
+				font-weight: normal;
+				box-shadow: 0 0 0;
+			}
+			.stwip--copy {
+				font-weight: bold;
+				box-shadow: 0 0 10px;
+			}
+		}
+	}
 }

@@ -76,6 +76,7 @@ const dom = {
 /**@type {{name:string, uid:string}} */
 let currentEditor;
 let editorRenderToken = null;
+let worldInfoPresetPlaceholder;
 
 const activationBlock = document.querySelector('#wiActivationSettings');
 const activationBlockParent = activationBlock.parentElement;
@@ -496,6 +497,117 @@ const assignSelectedEntriesToFolder = async(worldName, folderName, isCopy = fals
         }
         await saveWorldInfo(worldName, data, true);
     }
+};
+const transferEntryToBook = async(srcName, uid, dstName, isCopy = false)=>{
+    if (!srcName || !dstName) return false;
+    if (srcName == dstName) {
+        toastr.warning(`Entry is already in book "${dstName}"`, DISPLAY_NAME);
+        return false;
+    }
+
+    const [srcBook, dstBook] = await Promise.all([
+        loadWorldInfo(srcName),
+        loadWorldInfo(dstName),
+    ]);
+    if (!srcBook?.entries || !dstBook?.entries) {
+        toastr.error('Something went wrong', DISPLAY_NAME);
+        return false;
+    }
+
+    const srcEntry = srcBook.entries[uid];
+    if (!srcEntry) {
+        toastr.error('Could not find the selected entry.', DISPLAY_NAME);
+        return false;
+    }
+
+    const oData = Object.assign({}, srcEntry);
+    delete oData.uid;
+    const dstEntry = createWorldInfoEntry(null, dstBook);
+    Object.assign(dstEntry, oData);
+    await saveWorldInfo(dstName, dstBook, true);
+
+    if (!isCopy) {
+        const deleted = await deleteWorldInfoEntry(srcBook, uid, { silent:true });
+        if (deleted) {
+            deleteWIOriginalDataValue(srcBook, uid);
+            delete getWorldFolderState(srcName).entries[String(uid)];
+            await saveWorldInfo(srcName, srcBook, true);
+            updateWIChange(srcName, srcBook);
+        }
+    }
+    updateWIChange(dstName, dstBook);
+    toastr.success(`${isCopy ? 'Copied' : 'Transferred'} WI Entry`, DISPLAY_NAME);
+    return true;
+};
+const showWorldInfoPresetTransferPopup = async(srcName, uid, transferBtn)=>{
+    let sel;
+    let isCopy = false;
+    const srcEntry = cache[srcName]?.entries?.[uid];
+    const dom = document.createElement('div'); {
+        dom.classList.add('stwip--transferModal');
+        const title = document.createElement('h3'); {
+            title.textContent = 'Transfer World Info Entry';
+            dom.append(title);
+        }
+        const subTitle = document.createElement('h4'); {
+            const editorEntry = transferBtn.closest('.world_entry');
+            const entryName = editorEntry?.querySelector('[name="comment"]')?.value
+                || editorEntry?.querySelector('[name="key"]')?.value
+                || srcEntry?.comment
+                || srcEntry?.key?.join(', ')
+                || uid
+            ;
+            subTitle.textContent = `${srcName}: ${entryName}`;
+            dom.append(subTitle);
+        }
+        sel = /**@type {HTMLSelectElement}*/(document.querySelector('#world_editor_select').cloneNode(true)); {
+            sel.classList.add('stwip--worldSelect');
+            const currentOption = [...sel.children].find(it=>it.textContent == srcName);
+            sel.value = currentOption?.value ?? sel.value;
+            sel.addEventListener('keyup', (evt)=>{
+                if (evt.key == 'Shift') {
+                    (dlg.dom ?? dlg.dlg).classList.remove('stwip--isCopy');
+                }
+            });
+            sel.addEventListener('keydown', (evt)=>{
+                if (evt.key == 'Shift') {
+                    (dlg.dom ?? dlg.dlg).classList.add('stwip--isCopy');
+                    return;
+                }
+                if (!evt.ctrlKey && !evt.altKey && evt.key == 'Enter') {
+                    evt.preventDefault();
+                    if (evt.shiftKey) isCopy = true;
+                    dlg.completeAffirmative();
+                }
+            });
+            dom.append(sel);
+        }
+        const hintP = document.createElement('p'); {
+            const hint = document.createElement('small'); {
+                hint.textContent = 'Type to select book. Enter to transfer. Shift+Enter to copy.';
+                hintP.append(hint);
+            }
+            dom.append(hintP);
+        }
+    }
+    const dlg = new Popup(dom, POPUP_TYPE.CONFIRM, null, { okButton:'Transfer', cancelButton:'Cancel' });
+    const copyBtn = document.createElement('div'); {
+        copyBtn.classList.add('stwip--copy');
+        copyBtn.classList.add('menu_button');
+        copyBtn.textContent = 'Copy';
+        copyBtn.addEventListener('click', ()=>{
+            isCopy = true;
+            dlg.completeAffirmative();
+        });
+        (dlg.ok ?? dlg.okButton).insertAdjacentElement('afterend', copyBtn);
+    }
+    const prom = dlg.show();
+    sel.focus();
+    await prom;
+    if (dlg.result != POPUP_RESULT.AFFIRMATIVE) return;
+
+    const dstName = sel.selectedOptions[0].textContent;
+    await transferEntryToBook(srcName, uid, dstName, isCopy);
 };
 const createFolderHeader = (worldName, folderName, count)=>{
     const state = getWorldFolderState(worldName);
@@ -1580,6 +1692,44 @@ const loadList = async()=>{
 const loadListDebounced = debounceAsync(()=>loadList());
 
 
+const placeWorldInfoPresetControls = ()=>{
+    const presetControls = document.querySelector('#WorldInfo .stwip--container');
+    if (!presetControls) return;
+
+    if (!worldInfoPresetPlaceholder && !presetControls.closest('.stwid--list')) {
+        worldInfoPresetPlaceholder = document.createComment('Lorebook Manager WorldInfoPresets placeholder');
+        presetControls.parentNode?.insertBefore(worldInfoPresetPlaceholder, presetControls);
+    }
+
+    const managerControls = document.querySelector('#WorldInfo .stwid--list .stwid--controls');
+    if (document.body.classList.contains('stwid--') && managerControls) {
+        presetControls.classList.add('stwip--inManager');
+        presetControls.classList.add('stwid--presetCompat');
+        if (managerControls.nextElementSibling != presetControls) {
+            managerControls.insertAdjacentElement('afterend', presetControls);
+        }
+        return;
+    }
+
+    if (worldInfoPresetPlaceholder?.parentNode) {
+        presetControls.classList.remove('stwip--inManager');
+        presetControls.classList.remove('stwid--presetCompat');
+        if (worldInfoPresetPlaceholder.nextSibling != presetControls) {
+            worldInfoPresetPlaceholder.after(presetControls);
+        }
+    }
+};
+const watchWorldInfoPresetControls = ()=>{
+    const worldInfo = document.querySelector('#WorldInfo');
+    if (!worldInfo) return;
+    const mo = new MutationObserver(()=>placeWorldInfoPresetControls());
+    mo.observe(worldInfo, { childList:true, subtree:true });
+    const bodyMo = new MutationObserver(()=>placeWorldInfoPresetControls());
+    bodyMo.observe(document.body, { attributes:true, attributeFilter:['class'] });
+    placeWorldInfoPresetControls();
+};
+
+
 const addDrawer = ()=>{
     document.addEventListener('keydown', async(evt)=>{
         // only run when drawer is open
@@ -2243,11 +2393,19 @@ const addDrawer = ()=>{
             const editor = document.createElement('div'); {
                 dom.editor = editor;
                 editor.classList.add('stwid--editor');
+                editor.addEventListener('click', async(evt)=>{
+                    const transferBtn = /**@type {HTMLElement}*/(evt.target)?.closest?.('.stwip--transfer');
+                    if (!transferBtn || !currentEditor) return;
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    await showWorldInfoPresetTransferPopup(currentEditor.name, currentEditor.uid, transferBtn);
+                });
                 body.append(editor);
             }
             drawerContent.append(body);
         }
     }
+    watchWorldInfoPresetControls();
     drawerContent.querySelector('h3 > span').addEventListener('click', ()=>{
         const is = document.body.classList.toggle('stwid--');
         if (!is) {
@@ -2255,6 +2413,7 @@ const addDrawer = ()=>{
                 dom.activationToggle.click();
             }
         }
+        placeWorldInfoPresetControls();
     });
     const moSel = new MutationObserver(()=>updateWIChangeDebounced());
     moSel.observe(document.querySelector('#world_editor_select'), { childList: true });

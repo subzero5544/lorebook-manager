@@ -52,6 +52,33 @@ body.stwid-- #WorldInfo .stwid--list .stwid--controls {
 body.stwid-- #WorldInfo .stwid--list .stwid--controls .stwid--active {
   color: var(--SmartThemeQuoteColor);
 }
+body.stwid-- #WorldInfo .stwid--list > .stwip--container {
+  flex: 0 0 auto;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 0.35em 0.5em;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 0.5em;
+}
+body.stwid-- #WorldInfo .stwid--list > .stwip--container .stwip--preset {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 100%;
+}
+body.stwid-- #WorldInfo .stwid--list > .stwip--container > .stwip--actions {
+  flex: 0 1 auto;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25em;
+  min-width: max-content;
+}
+body.stwid-- #WorldInfo .stwid--list > .stwip--container .stwip--action {
+  margin: 0;
+}
 body.stwid-- #WorldInfo .stwid--list .stwid--filter {
   display: flex;
   gap: 0.75em;
@@ -66,6 +93,8 @@ body.stwid-- #WorldInfo .stwid--list .stwid--filter .stwid--filterActive {
 body.stwid-- #WorldInfo .stwid--list .stwid--books {
   flex: 1 1 auto;
   overflow: auto;
+  padding-right: 0.35em;
+  box-sizing: border-box;
 }
 body.stwid-- #WorldInfo .stwid--list .stwid--books .stwid--book {
   border-bottom: 2px solid var(--SmartThemeBorderColor);
@@ -84,6 +113,7 @@ body.stwid-- #WorldInfo .stwid--list .stwid--books .stwid--book:has(.stwid--entr
 body.stwid-- #WorldInfo .stwid--list .stwid--books .stwid--book .stwid--head {
   display: flex;
   gap: 0.5em;
+  margin-right: 0.25em;
   background-color: rgb(var(--primaryBgCol, var(--SmartThemeBlurTintColor)));
   position: sticky;
   top: 0;
@@ -201,6 +231,7 @@ body.stwid-- #WorldInfo .stwid--list .stwid--books .stwid--book .stwid--entry {
   gap: 0.5em;
   border-bottom: 2px solid var(--SmartThemeBorderColor);
   margin-left: 0.25em;
+  margin-right: 0.25em;
   overflow: hidden;
   transition: 200ms;
 }
@@ -701,4 +732,53 @@ dialog.popup:has(.stwid--folderManage) .popup-content {
   margin: 0;
   padding-left: 0.5em;
   font-size: small;
+}
+.shadow_popup:has(.stwip--transferModal) .dialogue_popup_ok,
+.shadow_popup:has(.stwip--transferModal) .popup-button-ok,
+.popup:has(.stwip--transferModal) .dialogue_popup_ok,
+.popup:has(.stwip--transferModal) .popup-button-ok,
+.shadow_popup:has(.stwip--transferModal) .stwip--copy,
+.popup:has(.stwip--transferModal) .stwip--copy {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  white-space: pre;
+  font-weight: normal;
+  box-shadow: 0 0 0;
+  transition: 200ms;
+}
+.shadow_popup:has(.stwip--transferModal) .dialogue_popup_ok:after,
+.shadow_popup:has(.stwip--transferModal) .popup-button-ok:after,
+.popup:has(.stwip--transferModal) .dialogue_popup_ok:after,
+.popup:has(.stwip--transferModal) .popup-button-ok:after {
+  content: 'Transfer';
+  height: 0;
+  overflow: hidden;
+  font-weight: bold;
+}
+.shadow_popup:has(.stwip--transferModal) .stwip--copy:after,
+.popup:has(.stwip--transferModal) .stwip--copy:after {
+  content: 'Copy';
+  height: 0;
+  overflow: hidden;
+  font-weight: bold;
+}
+.shadow_popup:has(.stwip--transferModal):has(.stwip--worldSelect:focus) .dialogue_popup_ok,
+.shadow_popup:has(.stwip--transferModal):has(.stwip--worldSelect:focus) .popup-button-ok,
+.popup:has(.stwip--transferModal):has(.stwip--worldSelect:focus) .dialogue_popup_ok,
+.popup:has(.stwip--transferModal):has(.stwip--worldSelect:focus) .popup-button-ok {
+  font-weight: bold;
+  box-shadow: 0 0 10px;
+}
+.shadow_popup:has(.stwip--transferModal).stwip--isCopy:has(.stwip--worldSelect:focus) .dialogue_popup_ok,
+.shadow_popup:has(.stwip--transferModal).stwip--isCopy:has(.stwip--worldSelect:focus) .popup-button-ok,
+.popup:has(.stwip--transferModal).stwip--isCopy:has(.stwip--worldSelect:focus) .dialogue_popup_ok,
+.popup:has(.stwip--transferModal).stwip--isCopy:has(.stwip--worldSelect:focus) .popup-button-ok {
+  font-weight: normal;
+  box-shadow: 0 0 0;
+}
+.shadow_popup:has(.stwip--transferModal).stwip--isCopy:has(.stwip--worldSelect:focus) .stwip--copy,
+.popup:has(.stwip--transferModal).stwip--isCopy:has(.stwip--worldSelect:focus) .stwip--copy {
+  font-weight: bold;
+  box-shadow: 0 0 10px;
 }
